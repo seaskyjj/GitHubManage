@@ -1,5 +1,7 @@
 # GitHub Stars Manager
 
+[中文](./README.md) | [English](./README_EN.md)
+
 一个用 `uv` 管理的本地 Web 项目，支持：
 
 1. 手动触发同步当前登录 GitHub 用户的 Stars。
