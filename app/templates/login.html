@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GitHub Stars Manager - 登录</title>
+    <link rel="stylesheet" href="/static/style.css?v=20260313b" />
+  </head>
+  <body class="login-body">
+    <main class="login-wrap">
+      <section class="login-card">
+        <p class="eyebrow">GitHub Stars Manager</p>
+        <h1>使用 GitHub Token 登录</h1>
+        <p class="muted">登录后可同步 Stars、管理自定义 List、抓取 Trending。</p>
+        <p class="muted">注意：写入 GitHub Stars Lists 建议使用 classic PAT（`ghp_`）或 OAuth token。</p>
+
+        {% if flash %}
+        <div class="flash {{ flash.kind }}">{{ flash.message }}</div>
+        {% endif %}
+
+        <form method="post" action="/login" class="stack">
+          <label for="token">Personal Access Token</label>
+          <input
+            id="token"
+            name="token"
+            type="password"
+            placeholder="ghp_xxx / github_pat_xxx"
+            required
+          />
+          <button type="submit">登录</button>
+        </form>
+      </section>
+    </main>
+  </body>
+</html>

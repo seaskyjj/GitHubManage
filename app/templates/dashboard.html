@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GitHub Stars Manager</title>
+    <link rel="stylesheet" href="/static/style.css?v=20260313b" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">GitHub Stars Manager</p>
+        <h1>{{ auth.name }} <span class="muted">(@{{ auth.login }})</span></h1>
+      </div>
+      <form action="/logout" method="post">
+        <button class="secondary" type="submit">退出登录</button>
+      </form>
+    </header>
+
+    {% if flash %}
+    <div class="flash {{ flash.kind }}">{{ flash.message }}</div>
+    {% endif %}
+
+    <main class="dashboard">
+      <section class="panel overview-panel">
+        <div class="overview-head">
+          <div>
+            <p class="eyebrow">Workspace</p>
+            <h2>功能导航</h2>
+            <p class="muted">在下方标签页切换 Stars、Lists、Trending 三个工作区。</p>
+          </div>
+          <div class="stat-grid">
+            <article class="stat-card">
+              <small>Stars</small>
+              <strong>{{ repos|length }}</strong>
+            </article>
+            <article class="stat-card">
+              <small>Lists</small>
+              <strong>{{ lists|length }}</strong>
+            </article>
+            <article class="stat-card">
+              <small>Trending</small>
+              <strong>{{ trending|length }}</strong>
+            </article>
+          </div>
+        </div>
+        <div class="feature-tabs" role="tablist" aria-label="功能切换">
+          <button class="tab-btn is-active" type="button" data-tab-target="stars">Stars 查询与管理</button>
+          <button class="tab-btn" type="button" data-tab-target="lists">List 查询与管理</button>
+          <button class="tab-btn" type="button" data-tab-target="trending">Trending 查询</button>
+        </div>
+      </section>
+
+      <section class="panel tab-panel is-active" id="panel-stars" data-tab-panel="stars">
+        <div class="panel-head">
+          <h2>Stars 同步与项目概览</h2>
+          <form action="/sync-stars" method="post">
+            <button type="submit">手动同步 Stars</button>
+          </form>
+        </div>
+        <p class="muted">最近同步时间：{{ stars_synced_at or "尚未同步" }}</p>
+
+        <form action="/manual-star" method="post" class="inline-form">
+          <label for="repo_full_name">手动添加 Star 项目（owner/repo）</label>
+          <input
+            id="repo_full_name"
+            name="repo_full_name"
+            placeholder="openai/openai-python"
+            required
+          />
+          <button type="submit">加星并更新</button>
+        </form>
+
+        <form method="get" action="/" class="inline-control">
+          <label for="sort_by">项目排序</label>
+          <select id="sort_by" name="sort_by">
+            <option value="synced_at" {% if sort_by == "synced_at" %}selected{% endif %}>按同步时间</option>
+            <option value="full_name" {% if sort_by == "full_name" %}selected{% endif %}>按项目名</option>
+            <option value="category" {% if sort_by == "category" %}selected{% endif %}>按分类</option>
+            <option value="list" {% if sort_by == "list" %}selected{% endif %}>按 List</option>
+            <option value="language" {% if sort_by == "language" %}selected{% endif %}>按语言</option>
+          </select>
+          <select id="sort_order" name="sort_order">
+            <option value="asc" {% if sort_order == "asc" %}selected{% endif %}>升序</option>
+            <option value="desc" {% if sort_order == "desc" %}selected{% endif %}>降序</option>
+          </select>
+          <button type="submit" class="ghost">应用排序</button>
+        </form>
+
+        <form id="bulk_assign_form" action="/lists/bulk-assign" method="post" class="inline-form">
+          <label for="target_list_id">多选项目分配到 List</label>
+          <select id="target_list_id" name="target_list_id" required>
+            <option value="">请选择 List</option>
+            {% for list in lists %}
+            {% if list.remote_id %}
+            <option value="{{ list.id }}">{{ list.name }}</option>
+            {% endif %}
+            {% endfor %}
+          </select>
+          <button type="submit">分配已勾选项目</button>
+        </form>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>选择</th>
+                <th>项目</th>
+                <th>分类</th>
+                <th>List</th>
+                <th>语言</th>
+                <th>描述摘要</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for repo in repos %}
+              <tr>
+                <td>
+                  <input
+                    type="checkbox"
+                    name="repo_full_names"
+                    value="{{ repo.full_name }}"
+                    form="bulk_assign_form"
+                  />
+                </td>
+                <td>
+                  <a href="{{ repo.html_url }}" target="_blank" rel="noreferrer"
+                    >{{ repo.full_name }}</a
+                  >
+                </td>
+                <td>{{ repo.category }}</td>
+                <td>{{ repo.lists_label }}</td>
+                <td>{{ repo.language or "未知" }}</td>
+                <td>{{ repo.blurb }}</td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="6" class="empty">暂无数据，请先同步 Stars。</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel tab-panel" id="panel-lists" data-tab-panel="lists">
+        <div class="panel-head">
+          <h2>Stars List 管理</h2>
+          <div class="panel-actions">
+            <form action="/lists/refresh" method="post">
+              <button class="secondary" type="submit">从 GitHub 同步 Lists</button>
+            </form>
+            <form action="/lists/cleanup-local" method="post">
+              <button class="ghost" type="submit">清理本地遗留 Lists</button>
+            </form>
+          </div>
+        </div>
+        <p class="muted">最近同步时间：{{ lists_synced_at or "尚未同步" }}</p>
+        {% if local_only_list_count > 0 %}
+        <p class="hint-warning">检测到 {{ local_only_list_count }} 个本地遗留 List（无远端 ID），不会同步到 GitHub。</p>
+        {% endif %}
+
+        <form action="/lists" method="post" class="inline-form">
+          <label for="list_name">新增 List</label>
+          <input id="list_name" name="list_name" placeholder="例如：AI 工具箱" required />
+          <button type="submit">创建 List</button>
+        </form>
+
+        <div class="list-grid">
+          {% for list in lists %}
+          <article class="list-card">
+            <div class="list-head">
+              <h3>{{ list.name }}</h3>
+              <small>
+                {{ list.item_count }} 项
+                {% if not list.remote_id %}
+                · 本地遗留
+                {% endif %}
+              </small>
+            </div>
+
+            <form action="/lists/{{ list.id }}/delete" method="post" class="row-end">
+              <button type="submit" class="danger">删除 List</button>
+            </form>
+
+            {% if list.remote_id %}
+            <form action="/lists/{{ list.id }}/items" method="post" class="stack">
+              <label for="repo_sync_{{ list.id }}">从已同步 Stars 中添加</label>
+              <select id="repo_sync_{{ list.id }}" name="repo_from_sync">
+                <option value="">请选择项目</option>
+                {% for repo in repos %}
+                <option value="{{ repo.full_name }}">{{ repo.full_name }}</option>
+                {% endfor %}
+              </select>
+              <label for="repo_manual_{{ list.id }}">或手动输入</label>
+              <input
+                id="repo_manual_{{ list.id }}"
+                name="repo_full_name"
+                placeholder="owner/repo"
+              />
+              <button type="submit">加入 List</button>
+            </form>
+            {% else %}
+            <p class="hint-warning">该 List 为历史本地数据，不能写回 GitHub。建议清理后重新从 GitHub 同步。</p>
+            {% endif %}
+
+            <ul class="list-items">
+              {% for item in list_items[list.id] %}
+              <li>
+                <a href="{{ item.html_url or ('https://github.com/' ~ item.repo_full_name) }}" target="_blank" rel="noreferrer">
+                  {{ item.repo_full_name }}
+                </a>
+                <form action="/lists/{{ list.id }}/items/remove" method="post">
+                  <input type="hidden" name="repo_full_name" value="{{ item.repo_full_name }}" />
+                  <button class="ghost" type="submit">移除</button>
+                </form>
+              </li>
+              {% else %}
+              <li class="empty">当前 List 为空。</li>
+              {% endfor %}
+            </ul>
+          </article>
+          {% else %}
+          <p class="empty">还没有自定义 List。</p>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section class="panel tab-panel" id="panel-trending" data-tab-panel="trending">
+        <div class="panel-head">
+          <h2>Trending 概述</h2>
+          <form action="/sync-trending" method="post" class="inline-control">
+            <select name="since">
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+            </select>
+            <button type="submit">抓取 Trending</button>
+          </form>
+        </div>
+        <p class="muted">最近同步时间：{{ trending_synced_at or "尚未同步" }}</p>
+        <p class="summary">{{ trending_summary or "暂无 Trending 概述。" }}</p>
+
+        <div class="trend-grid">
+          {% for repo in trending %}
+          <article class="trend-card">
+            <small>Top {{ repo.rank_no }}</small>
+            <h3>
+              <a href="{{ repo.html_url }}" target="_blank" rel="noreferrer">{{ repo.full_name }}</a>
+            </h3>
+            <p>{{ repo.blurb }}</p>
+            <p class="meta">
+              <span>{{ repo.language or "未知语言" }}</span>
+              <span>今日 +{{ repo.stars_today }}</span>
+              <span>总星标 {{ repo.stars_total }}</span>
+            </p>
+          </article>
+          {% else %}
+          <p class="empty">暂无 Trending 数据，请先抓取。</p>
+          {% endfor %}
+        </div>
+      </section>
+    </main>
+    <script>
+      (() => {
+        const tabButtons = Array.from(document.querySelectorAll("[data-tab-target]"));
+        const tabPanels = Array.from(document.querySelectorAll("[data-tab-panel]"));
+        const allowed = new Set(["stars", "lists", "trending"]);
+        const storageKey = "github-stars-manager.active-tab";
+
+        const activate = (name) => {
+          if (!allowed.has(name)) return;
+          tabButtons.forEach((button) => {
+            const active = button.dataset.tabTarget === name;
+            button.classList.toggle("is-active", active);
+            button.setAttribute("aria-selected", active ? "true" : "false");
+          });
+          tabPanels.forEach((panel) => {
+            panel.classList.toggle("is-active", panel.dataset.tabPanel === name);
+          });
+          try {
+            localStorage.setItem(storageKey, name);
+          } catch (error) {
+            void error;
+          }
+          if (history.replaceState) {
+            history.replaceState(null, "", `#${name}`);
+          }
+        };
+
+        document.body.classList.add("tabs-ready");
+        tabButtons.forEach((button) => {
+          button.setAttribute("role", "tab");
+          button.setAttribute("aria-selected", button.classList.contains("is-active") ? "true" : "false");
+          button.addEventListener("click", () => activate(button.dataset.tabTarget || ""));
+        });
+
+        const fromHash = (window.location.hash || "").replace("#", "");
+        let fromStorage = "";
+        try {
+          fromStorage = localStorage.getItem(storageKey) || "";
+        } catch (error) {
+          void error;
+        }
+        activate(allowed.has(fromHash) ? fromHash : fromStorage || "stars");
+      })();
+    </script>
+  </body>
+</html>
